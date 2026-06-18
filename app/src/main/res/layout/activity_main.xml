@@ -62,6 +62,16 @@
         android:layout_marginBottom="12dp" />
 
     <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_grant_storage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Grant log file access (Documents)"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:paddingHorizontal="32dp"
+        android:paddingVertical="12dp"
+        android:layout_marginBottom="12dp" />
+
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/btn_check_update"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

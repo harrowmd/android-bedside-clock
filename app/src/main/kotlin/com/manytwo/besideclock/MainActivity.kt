@@ -3,7 +3,9 @@ package com.manytwo.besideclock
 import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.provider.Settings
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -40,8 +42,14 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
-        binding.btnCheckUpdate.setOnClickListener { checkForUpdate() }
+        binding.btnGrantStorage.setOnClickListener {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    Uri.parse("package:$packageName")))
+            }
+        }
 
+        binding.btnCheckUpdate.setOnClickListener { checkForUpdate() }
         binding.btnShareLog.setOnClickListener { shareLog() }
 
         if (!Settings.System.canWrite(this)) {
@@ -65,11 +73,20 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        val granted = Settings.System.canWrite(this)
-        binding.btnGrantBrightness.text = if (granted)
+        Logger.init(this) // re-resolve in case storage permission was just granted
+
+        val brightnessGranted = Settings.System.canWrite(this)
+        binding.btnGrantBrightness.text = if (brightnessGranted)
             "Brightness permission: granted ✓"
         else
             getString(R.string.grant_brightness)
+
+        val storageGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
+                Environment.isExternalStorageManager()
+        binding.btnGrantStorage.text = if (storageGranted)
+            "Log file: Documents/bedside-clock.log ✓"
+        else
+            "Grant log file access (Documents)"
     }
 
     private fun shareLog() {

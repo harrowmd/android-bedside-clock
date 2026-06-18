@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Required for the "Check for updates" GitHub API call -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required to write bedside-clock.log to the public Documents folder -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
 
     <application
         android:allowBackup="true"

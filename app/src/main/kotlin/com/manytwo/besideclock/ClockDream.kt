@@ -125,7 +125,7 @@ class ClockDream : DreamService() {
 
         findViewById<TextView>(R.id.btn_settings).setOnClickListener { openSettings() }
         findViewById<View>(R.id.backdrop).setOnClickListener { closeSettings() }
-        findViewById<TextView>(R.id.btn_dismiss).setOnClickListener { wakeUp() }
+        findViewById<TextView>(R.id.btn_dismiss).setOnClickListener { closeSettings() }
 
         sliderBrightness.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
