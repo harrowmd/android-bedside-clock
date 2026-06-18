@@ -49,9 +49,11 @@ class ClockDream : DreamService() {
     private var dateTimer: Timer? = null
     private var dreamStartMs: Long = 0L
 
-    // Saved so we can restore the system brightness when the dream ends
+    // Saved so we can restore system settings when the dream ends
     private var savedBrightness: Int = -1
     private var savedBrightnessMode: Int = -1
+    private var savedDozeAlwaysOn: Int = -1
+    private var savedStayOn: Int = -1
 
     // Explicit wake lock as a final fallback for OEM ROMs that ignore window flags
     private var wakeLock: PowerManager.WakeLock? = null
@@ -149,6 +151,7 @@ class ClockDream : DreamService() {
     override fun onDreamingStarted() {
         super.onDreamingStarted()
         dreamStartMs = System.currentTimeMillis()
+        Logger.init(this) // re-resolve path in case storage permission was granted since last launch
         Logger.log("Clock started — font=${settings.fontFamily} size=${settings.fontSize.toInt()}sp brightness=${(settings.brightness * 100).toInt()}%")
         // Save current system brightness so we can restore it when the dream ends
         if (Settings.System.canWrite(this)) {
@@ -157,6 +160,19 @@ class ClockDream : DreamService() {
             savedBrightnessMode = Settings.System.getInt(
                 contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
                 Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+        }
+        // Disable AOD and force screen-on-while-charging so Doze can't steal the display
+        try {
+            savedDozeAlwaysOn = Settings.Secure.getInt(contentResolver, "doze_always_on", 0)
+            Settings.Secure.putInt(contentResolver, "doze_always_on", 0)
+            savedStayOn = Settings.Global.getInt(contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 0)
+            Settings.Global.putInt(contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN,
+                android.os.BatteryManager.BATTERY_PLUGGED_AC or
+                android.os.BatteryManager.BATTERY_PLUGGED_USB or
+                android.os.BatteryManager.BATTERY_PLUGGED_WIRELESS)
+            Logger.log("AOD disabled, stay-on-while-plugged-in enabled")
+        } catch (e: Exception) {
+            Logger.log("Could not disable AOD: ${e.message}")
         }
         applyBrightness(settings.brightness)
         updateDates()
@@ -200,6 +216,13 @@ class ClockDream : DreamService() {
             Settings.System.putInt(contentResolver,
                 Settings.System.SCREEN_BRIGHTNESS, savedBrightness)
         }
+        // Restore AOD and stay-on settings
+        try {
+            if (savedDozeAlwaysOn >= 0)
+                Settings.Secure.putInt(contentResolver, "doze_always_on", savedDozeAlwaysOn)
+            if (savedStayOn >= 0)
+                Settings.Global.putInt(contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, savedStayOn)
+        } catch (_: Exception) {}
     }
 
     // ── Apply all saved settings to the clock display ────────────────────────

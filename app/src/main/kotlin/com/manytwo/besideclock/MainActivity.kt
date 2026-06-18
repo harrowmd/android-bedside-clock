@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnCheckUpdate.setOnClickListener { checkForUpdate() }
         binding.btnShareLog.setOnClickListener { shareLog() }
+        binding.btnExit.setOnClickListener { finish() }
 
         if (!Settings.System.canWrite(this)) {
             AlertDialog.Builder(this)
