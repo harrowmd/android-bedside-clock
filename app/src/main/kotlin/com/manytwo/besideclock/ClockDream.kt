@@ -13,6 +13,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.service.dreams.DreamService
 import android.view.View
@@ -47,6 +48,9 @@ class ClockDream : DreamService() {
     // Saved so we can restore the system brightness when the dream ends
     private var savedBrightness: Int = -1
     private var savedBrightnessMode: Int = -1
+
+    // Explicit wake lock as a final fallback for OEM ROMs that ignore window flags
+    private var wakeLock: PowerManager.WakeLock? = null
 
     // OLED burn-in protection: slow periodic drift of the clock container
     private lateinit var driftContainer: FrameLayout
@@ -86,6 +90,13 @@ class ClockDream : DreamService() {
         setContentView(R.layout.dream_clock)
 
         settings = ClockSettings(this)
+
+        // Belt-and-suspenders: keep screen on even if the OEM power manager
+        // tries to override the DreamService's own internal wake lock.
+        window?.addFlags(
+            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+            android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+        )
 
         driftContainer   = findViewById(R.id.clock_drift_container)
         layoutSingle     = findViewById(R.id.layout_single)
@@ -148,12 +159,19 @@ class ClockDream : DreamService() {
             registerReceiver(batteryReceiver, filter)
         }
 
+        // Explicit wake lock — last resort for ROMs that ignore FLAG_KEEP_SCREEN_ON
+        @Suppress("DEPRECATION")
+        wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
+            .newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "BesideClock::KeepOn")
+            .also { it.acquire() }
+
         // Start drift after the first interval so the clock is fully visible at launch
         driftHandler.postDelayed(driftRunnable, DRIFT_INTERVAL_MS)
     }
 
     override fun onDreamingStopped() {
         super.onDreamingStopped()
+        wakeLock?.release(); wakeLock = null
         driftHandler.removeCallbacks(driftRunnable)
         driftContainer.animate().cancel()
         dateTimer?.cancel(); dateTimer = null
