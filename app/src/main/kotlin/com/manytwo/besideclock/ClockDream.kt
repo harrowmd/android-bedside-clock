@@ -48,6 +48,7 @@ class ClockDream : DreamService() {
     private lateinit var settings: ClockSettings
     private var dateTimer: Timer? = null
     private var dreamStartMs: Long = 0L
+    private var startBatteryLevel: Int = -1
 
     // Saved so we can restore system settings when the dream ends
     private var savedBrightness: Int = -1
@@ -68,9 +69,21 @@ class ClockDream : DreamService() {
     }
 
     companion object {
-        private const val DRIFT_INTERVAL_MS = 3 * 60 * 1000L  // move every 3 minutes
-        private const val DRIFT_DURATION_MS  = 60 * 1000L      // glide over 60 seconds
-        private const val DRIFT_MAX_DP       = 22              // max offset in either axis
+        private const val DRIFT_INTERVAL_MS     = 3 * 60 * 1000L   // move every 3 minutes
+        private const val DRIFT_DURATION_MS     = 60 * 1000L        // glide over 60 seconds
+        private const val DRIFT_MAX_DP          = 22                // max offset in either axis
+        private const val HEARTBEAT_INTERVAL_MS = 30 * 60 * 1000L  // log every 30 minutes
+    }
+
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            val elapsedSec = (System.currentTimeMillis() - dreamStartMs) / 1000L
+            val h = elapsedSec / 3600; val m = (elapsedSec % 3600) / 60; val s = elapsedSec % 60
+            val (level, watts, charging) = readBatteryInfo()
+            val wStr = if (watts > 0f) " ${if (charging) "+" else "-"}%.1fW".format(watts) else ""
+            Logger.log("[heartbeat] battery=${level}%$wStr elapsed=%02d:%02d:%02d".format(h, m, s))
+            driftHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
+        }
     }
 
     private val batteryReceiver = object : BroadcastReceiver() {
@@ -78,10 +91,21 @@ class ClockDream : DreamService() {
             val level  = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
             val scale  = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
             val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+            val voltMV = intent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0)
             val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
                            status == BatteryManager.BATTERY_STATUS_FULL
             if (level >= 0 && scale > 0) {
-                tvBattery.text = if (charging) "⚡ ${level * 100 / scale}%" else "${level * 100 / scale}%"
+                val pct = level * 100 / scale
+                val currentµA = try {
+                    val v = (context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager)
+                        .getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+                    if (v == Integer.MIN_VALUE) 0 else v
+                } catch (_: Exception) { 0 }
+                val watts = if (voltMV > 0 && currentµA != 0)
+                    Math.abs(currentµA.toLong()).toFloat() / 1_000_000f * voltMV / 1000f else 0f
+                val wStr = if (watts > 0.1f)
+                    " (${if (charging) "+" else "-"}${"%.1f".format(watts)}W)" else ""
+                tvBattery.text = if (charging) "⚡ $pct%$wStr" else "$pct%$wStr"
             }
         }
     }
@@ -151,8 +175,11 @@ class ClockDream : DreamService() {
     override fun onDreamingStarted() {
         super.onDreamingStarted()
         dreamStartMs = System.currentTimeMillis()
-        Logger.init(this) // re-resolve path in case storage permission was granted since last launch
-        Logger.log("Clock started — font=${settings.fontFamily} size=${settings.fontSize.toInt()}sp brightness=${(settings.brightness * 100).toInt()}%")
+        Logger.init(this)
+        val (startLevel, startWatts, startCharging) = readBatteryInfo()
+        startBatteryLevel = startLevel
+        val wStr = if (startWatts > 0.1f) " ${if (startCharging) "+" else "-"}${"%.1f".format(startWatts)}W" else ""
+        Logger.log("Clock started — font=${settings.fontFamily} size=${settings.fontSize.toInt()}sp brightness=${(settings.brightness * 100).toInt()}% battery=${startLevel}%$wStr")
         // Save current system brightness so we can restore it when the dream ends
         if (Settings.System.canWrite(this)) {
             savedBrightness = Settings.System.getInt(
@@ -190,17 +217,23 @@ class ClockDream : DreamService() {
             .newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "BesideClock::KeepOn")
             .also { it.acquire() }
 
-        // Start drift after the first interval so the clock is fully visible at launch
         driftHandler.postDelayed(driftRunnable, DRIFT_INTERVAL_MS)
+        driftHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS)
     }
 
     override fun onDreamingStopped() {
         super.onDreamingStopped()
         val elapsedSec = (System.currentTimeMillis() - dreamStartMs) / 1000L
         val h = elapsedSec / 3600; val m = (elapsedSec % 3600) / 60; val s = elapsedSec % 60
-        Logger.log("Clock stopped — elapsed %02d:%02d:%02d".format(h, m, s))
+        val (stopLevel, _, _) = readBatteryInfo()
+        val deltaStr = if (startBatteryLevel >= 0 && stopLevel >= 0) {
+            val d = stopLevel - startBatteryLevel
+            " battery=${stopLevel}% (${if (d >= 0) "+$d" else "$d"}%)"
+        } else ""
+        Logger.log("Clock stopped — elapsed %02d:%02d:%02d$deltaStr".format(h, m, s))
         wakeLock?.release(); wakeLock = null
         driftHandler.removeCallbacks(driftRunnable)
+        driftHandler.removeCallbacks(heartbeatRunnable)
         driftContainer.animate().cancel()
         dateTimer?.cancel(); dateTimer = null
         try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
@@ -410,6 +443,27 @@ class ClockDream : DreamService() {
         val s = SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date())
         tvDate.text = s
         tvDateGiant.text = s
+    }
+
+    private fun readBatteryInfo(): Triple<Int, Float, Boolean> {
+        val intent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = intent?.let {
+            val l = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+            val s = it.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+            if (l >= 0 && s > 0) l * 100 / s else -1
+        } ?: -1
+        val voltMV = intent?.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0) ?: 0
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                       status == BatteryManager.BATTERY_STATUS_FULL
+        val currentµA = try {
+            val v = (getSystemService(Context.BATTERY_SERVICE) as BatteryManager)
+                .getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
+            if (v == Integer.MIN_VALUE) 0 else v  // MIN_VALUE = "not supported"
+        } catch (_: Exception) { 0 }
+        val watts = if (voltMV > 0 && currentµA != 0)
+            Math.abs(currentµA.toLong()).toFloat() / 1_000_000f * voltMV / 1000f else 0f
+        return Triple(level, watts, charging)
     }
 
     private fun applyBrightness(level: Float) {

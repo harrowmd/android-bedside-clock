@@ -51,6 +51,12 @@ class MainActivity : AppCompatActivity() {
 
         binding.btnCheckUpdate.setOnClickListener { checkForUpdate() }
         binding.btnShareLog.setOnClickListener { shareLog() }
+        binding.btnOpenDisplaySettings.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_DISPLAY_SETTINGS))
+        }
+        binding.btnOpenSecuritySettings.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS))
+        }
 
         if (!Settings.System.canWrite(this)) {
             AlertDialog.Builder(this)
@@ -87,6 +93,47 @@ class MainActivity : AppCompatActivity() {
             "Log file: Documents/bedside-clock.log ✓"
         else
             "Grant log file access (Documents)"
+
+        updatePhoneSettings()
+    }
+
+    private fun updatePhoneSettings() {
+        val cr = contentResolver
+
+        val timeoutMs = Settings.System.getLong(cr, Settings.System.SCREEN_OFF_TIMEOUT, -1L)
+        binding.tvSettingScreenTimeout.text = "Screen timeout: ${formatDuration(timeoutMs)}"
+
+        val lockAfterMs = try {
+            Settings.Secure.getLong(cr, "lock_screen_lock_after_timeout", -1L)
+        } catch (_: Exception) { -1L }
+        val lockText = when {
+            lockAfterMs < 0 -> "Lock after timeout: unknown"
+            lockAfterMs == 0L -> "Lock after timeout: Immediately ⚠ (clock may not start)"
+            else -> "Lock after timeout: ${formatDuration(lockAfterMs)} ✓"
+        }
+        binding.tvSettingLockAfter.text = lockText
+        binding.tvSettingLockAfter.setTextColor(
+            if (lockAfterMs == 0L) 0xFFFF6600.toInt() else android.graphics.Color.GRAY
+        )
+
+        val adaptiveSleep = try {
+            Settings.Secure.getInt(cr, "adaptive_sleep", -1)
+        } catch (_: Exception) { -1 }
+        binding.tvSettingAdaptiveSleep.text = when (adaptiveSleep) {
+            0 -> "Adaptive sleep: off ✓"
+            1 -> "Adaptive sleep: on ⚠ (may delay clock start)"
+            else -> "Adaptive sleep: not available"
+        }
+        binding.tvSettingAdaptiveSleep.setTextColor(
+            if (adaptiveSleep == 1) 0xFFFF6600.toInt() else android.graphics.Color.GRAY
+        )
+    }
+
+    private fun formatDuration(ms: Long): String = when {
+        ms <= 0 -> "unknown"
+        ms < 60_000 -> "${ms / 1000} seconds"
+        ms < 3_600_000 -> "${ms / 60_000} minutes"
+        else -> "${ms / 3_600_000} hours"
     }
 
     private fun shareLog() {

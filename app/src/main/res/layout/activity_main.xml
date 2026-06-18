@@ -100,6 +100,71 @@
                 android:paddingHorizontal="32dp"
                 android:paddingVertical="12dp" />
 
+            <!-- ── Phone settings check ── -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="?android:attr/listDivider"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PHONE SETTINGS"
+                android:textSize="11sp"
+                android:letterSpacing="0.12"
+                android:textColor="?android:textColorSecondary"
+                android:layout_marginBottom="10dp" />
+
+            <TextView
+                android:id="@+id/tv_setting_screen_timeout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/tv_setting_lock_after"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:layout_marginBottom="4dp" />
+
+            <TextView
+                android:id="@+id/tv_setting_adaptive_sleep"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="14sp"
+                android:layout_marginBottom="16dp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_open_display_settings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Display"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:paddingHorizontal="20dp"
+                    android:paddingVertical="8dp"
+                    android:layout_marginEnd="8dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_open_security_settings"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Security / Lock screen"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:paddingHorizontal="20dp"
+                    android:paddingVertical="8dp" />
+
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/tv_version"
                 android:layout_width="wrap_content"
