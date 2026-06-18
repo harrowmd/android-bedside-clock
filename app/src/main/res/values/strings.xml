@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Bedside Clock</string>
+    <string name="dream_label">Bedside Clock</string>
+    <string name="open_screensaver_settings">Open Screensaver Settings</string>
+    <string name="preview">Preview Clock</string>
+    <string name="brightness_hint">To enable the brightness slider, grant permission to adjust system brightness.</string>
+    <string name="grant_brightness">Grant Brightness Permission</string>
+    <string name="setup_instructions">Tap the button below, then:\n\n1. Select \"Bedside Clock\" from the list\n2. Set \"When to use\" to While charging\n\nThe amber clock will appear automatically whenever your phone is plugged in and the screen is idle.\n\nTap the clock screen to adjust brightness.</string>
+</resources>
