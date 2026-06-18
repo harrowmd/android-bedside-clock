@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -41,9 +42,12 @@ class ClockDream : DreamService() {
     private lateinit var rowFonts: LinearLayout
     private lateinit var rowSizes: LinearLayout
     private lateinit var sliderBrightness: SeekBar
+    private lateinit var tvVersion: TextView
+    private lateinit var btnCheckUpdate: TextView
 
     private lateinit var settings: ClockSettings
     private var dateTimer: Timer? = null
+    private var dreamStartMs: Long = 0L
 
     // Saved so we can restore the system brightness when the dream ends
     private var savedBrightness: Int = -1
@@ -89,6 +93,7 @@ class ClockDream : DreamService() {
         isInteractive = true
         setContentView(R.layout.dream_clock)
 
+        Logger.init(this)
         settings = ClockSettings(this)
 
         // Belt-and-suspenders: keep screen on even if the OEM power manager
@@ -112,6 +117,11 @@ class ClockDream : DreamService() {
         rowFonts         = findViewById(R.id.row_fonts)
         rowSizes         = findViewById(R.id.row_sizes)
         sliderBrightness = findViewById(R.id.slider_brightness)
+        tvVersion        = findViewById(R.id.tv_version)
+        btnCheckUpdate   = findViewById(R.id.btn_check_update)
+
+        tvVersion.text = "v${BuildConfig.VERSION_NAME}  ·  ${BuildConfig.BUILD_DATE}"
+        btnCheckUpdate.setOnClickListener { checkForUpdate() }
 
         findViewById<TextView>(R.id.btn_settings).setOnClickListener { openSettings() }
         findViewById<View>(R.id.backdrop).setOnClickListener { closeSettings() }
@@ -125,7 +135,9 @@ class ClockDream : DreamService() {
                 applyBrightness(level)
             }
             override fun onStartTrackingTouch(sb: SeekBar) {}
-            override fun onStopTrackingTouch(sb: SeekBar) {}
+            override fun onStopTrackingTouch(sb: SeekBar) {
+                Logger.log("Brightness changed → ${sb.progress}%")
+            }
         })
 
         buildColorRow()
@@ -136,6 +148,8 @@ class ClockDream : DreamService() {
 
     override fun onDreamingStarted() {
         super.onDreamingStarted()
+        dreamStartMs = System.currentTimeMillis()
+        Logger.log("Clock started — font=${settings.fontFamily} size=${settings.fontSize.toInt()}sp brightness=${(settings.brightness * 100).toInt()}%")
         // Save current system brightness so we can restore it when the dream ends
         if (Settings.System.canWrite(this)) {
             savedBrightness = Settings.System.getInt(
@@ -171,6 +185,9 @@ class ClockDream : DreamService() {
 
     override fun onDreamingStopped() {
         super.onDreamingStopped()
+        val elapsedSec = (System.currentTimeMillis() - dreamStartMs) / 1000L
+        val h = elapsedSec / 3600; val m = (elapsedSec % 3600) / 60; val s = elapsedSec % 60
+        Logger.log("Clock stopped — elapsed %02d:%02d:%02d".format(h, m, s))
         wakeLock?.release(); wakeLock = null
         driftHandler.removeCallbacks(driftRunnable)
         driftContainer.animate().cancel()
@@ -213,10 +230,12 @@ class ClockDream : DreamService() {
         buildFontRow()
         buildSizeRow()
         overlaySettings.visibility = View.VISIBLE
+        Logger.log("Settings opened")
     }
 
     private fun closeSettings() {
         overlaySettings.visibility = View.GONE
+        Logger.log("Settings closed")
     }
 
     private fun buildColorRow() {
@@ -252,6 +271,7 @@ class ClockDream : DreamService() {
                 contentDescription = name
                 layoutParams = LinearLayout.LayoutParams(sz, sz).apply { marginEnd = gap }
                 setOnClickListener {
+                    Logger.log("Colour changed → $name (#%06X)".format(color and 0xFFFFFF))
                     settings.color = color
                     applyAll()
                     buildColorRow()
@@ -273,6 +293,7 @@ class ClockDream : DreamService() {
         fonts.forEach { (family, label) ->
             rowFonts.addView(chip(label, family == settings.fontFamily,
                 Typeface.create(family, Typeface.NORMAL)) {
+                Logger.log("Font changed → $label ($family)")
                 settings.fontFamily = family
                 applyAll()
                 buildFontRow()
@@ -285,11 +306,42 @@ class ClockDream : DreamService() {
         rowSizes.removeAllViews()
         sizes.forEach { (size, label) ->
             rowSizes.addView(chip(label, size == settings.fontSize) {
+                Logger.log("Size changed → $label (${size.toInt()}sp)")
                 settings.fontSize = size
                 applyAll()
                 buildSizeRow()
             })
         }
+    }
+
+    private fun checkForUpdate() {
+        btnCheckUpdate.isClickable = false
+        btnCheckUpdate.text = "Checking…"
+        Thread {
+            val (latestTag, releaseUrl) = fetchLatestRelease()
+            driftHandler.post {
+                btnCheckUpdate.isClickable = true
+                val latest = latestTag.removePrefix("v")
+                if (latest.isNotEmpty() && latest != BuildConfig.VERSION_NAME) {
+                    btnCheckUpdate.text = "Update: v$latest — tap to download"
+                    btnCheckUpdate.setTextColor(Color.parseColor("#FFAA00"))
+                    btnCheckUpdate.setOnClickListener {
+                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl)).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        })
+                    }
+                } else if (latest.isEmpty()) {
+                    btnCheckUpdate.text = "Could not check — try again"
+                    driftHandler.postDelayed({ btnCheckUpdate.text = "Check for updates" }, 3_000)
+                } else {
+                    btnCheckUpdate.text = "Up to date ✓"
+                    driftHandler.postDelayed({
+                        btnCheckUpdate.text = "Check for updates"
+                        btnCheckUpdate.setOnClickListener { checkForUpdate() }
+                    }, 3_000)
+                }
+            }
+        }.start()
     }
 
     private fun chip(

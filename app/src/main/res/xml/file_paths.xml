@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- app-specific external storage: /sdcard/Android/data/com.manytwo.besideclock/files/ -->
+    <external-files-path name="logs" path="." />
+    <!-- app-specific internal storage fallback -->
+    <files-path name="logs_internal" path="." />
+</paths>

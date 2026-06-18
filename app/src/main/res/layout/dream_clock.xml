@@ -289,6 +289,35 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical" />
 
+                <!-- VERSION / UPDATE ─────────────────── -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="24dp">
+
+                    <TextView
+                        android:id="@+id/tv_version"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="v1.0"
+                        android:textSize="12sp"
+                        android:textColor="#444444" />
+
+                    <TextView
+                        android:id="@+id/btn_check_update"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Check for updates"
+                        android:textSize="13sp"
+                        android:textColor="#888888"
+                        android:clickable="true"
+                        android:focusable="true" />
+
+                </LinearLayout>
+
             </LinearLayout>
 
         </ScrollView>

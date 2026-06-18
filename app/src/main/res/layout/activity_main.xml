@@ -58,6 +58,35 @@
         android:text="@string/grant_brightness"
         style="@style/Widget.MaterialComponents.Button.OutlinedButton"
         android:paddingHorizontal="32dp"
+        android:paddingVertical="12dp"
+        android:layout_marginBottom="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_check_update"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Check for Updates"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:paddingHorizontal="32dp"
+        android:paddingVertical="12dp"
+        android:layout_marginBottom="12dp" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_share_log"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Share Log File"
+        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+        android:paddingHorizontal="32dp"
         android:paddingVertical="12dp" />
+
+    <TextView
+        android:id="@+id/tv_version"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="v1.0"
+        android:textSize="12sp"
+        android:textColor="?android:textColorHint"
+        android:layout_marginTop="24dp" />
 
 </LinearLayout>

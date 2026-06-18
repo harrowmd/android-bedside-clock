@@ -1,7 +1,12 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+val buildDate: String = SimpleDateFormat("yyyy-MM-dd").format(Date())
 
 android {
     namespace = "com.manytwo.besideclock"
@@ -13,6 +18,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+
+        buildConfigField("String", "BUILD_DATE", "\"$buildDate\"")
+        buildConfigField("String", "GITHUB_REPO", "\"harrowmd/android-bedside-clock\"")
     }
 
     buildTypes {
@@ -36,6 +44,7 @@ android {
 
     buildFeatures {
         viewBinding = true
+        buildConfig = true
     }
 }
 
