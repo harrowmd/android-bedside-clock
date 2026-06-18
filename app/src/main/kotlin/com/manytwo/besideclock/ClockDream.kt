@@ -53,7 +53,6 @@ class ClockDream : DreamService() {
     private var savedBrightness: Int = -1
     private var savedBrightnessMode: Int = -1
     private var savedDozeAlwaysOn: Int = -1
-    private var savedStayOn: Int = -1
 
     // Explicit wake lock as a final fallback for OEM ROMs that ignore window flags
     private var wakeLock: PowerManager.WakeLock? = null
@@ -128,6 +127,7 @@ class ClockDream : DreamService() {
         findViewById<TextView>(R.id.btn_settings).setOnClickListener { openSettings() }
         findViewById<View>(R.id.backdrop).setOnClickListener { closeSettings() }
         findViewById<TextView>(R.id.btn_dismiss).setOnClickListener { closeSettings() }
+        findViewById<TextView>(R.id.btn_exit_clock).setOnClickListener { wakeUp() }
 
         sliderBrightness.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
@@ -161,18 +161,13 @@ class ClockDream : DreamService() {
                 contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
                 Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
         }
-        // Disable AOD and force screen-on-while-charging so Doze can't steal the display
+        // Disable AOD so the DozeService cannot steal the display while we are dreaming
         try {
             savedDozeAlwaysOn = Settings.Secure.getInt(contentResolver, "doze_always_on", 0)
             Settings.Secure.putInt(contentResolver, "doze_always_on", 0)
-            savedStayOn = Settings.Global.getInt(contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, 0)
-            Settings.Global.putInt(contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN,
-                android.os.BatteryManager.BATTERY_PLUGGED_AC or
-                android.os.BatteryManager.BATTERY_PLUGGED_USB or
-                android.os.BatteryManager.BATTERY_PLUGGED_WIRELESS)
-            Logger.log("AOD disabled, stay-on-while-plugged-in enabled")
+            Logger.log("AOD disabled for dream session")
         } catch (e: Exception) {
-            Logger.log("Could not disable AOD: ${e.message}")
+            Logger.log("AOD disable skipped: ${e.message}")
         }
         applyBrightness(settings.brightness)
         updateDates()
@@ -216,12 +211,10 @@ class ClockDream : DreamService() {
             Settings.System.putInt(contentResolver,
                 Settings.System.SCREEN_BRIGHTNESS, savedBrightness)
         }
-        // Restore AOD and stay-on settings
+        // Restore AOD setting
         try {
             if (savedDozeAlwaysOn >= 0)
                 Settings.Secure.putInt(contentResolver, "doze_always_on", savedDozeAlwaysOn)
-            if (savedStayOn >= 0)
-                Settings.Global.putInt(contentResolver, Settings.Global.STAY_ON_WHILE_PLUGGED_IN, savedStayOn)
         } catch (_: Exception) {}
     }
 
