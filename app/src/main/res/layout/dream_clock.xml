@@ -6,6 +6,12 @@
     android:background="#000000"
     android:keepScreenOn="true">
 
+    <!-- ══ Drift container — translated slowly for OLED burn-in protection ══ -->
+    <FrameLayout
+        android:id="@+id/clock_drift_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
     <!-- ══ Single-line clock  (sizes S / M / L) ══ -->
     <LinearLayout
         android:id="@+id/layout_single"
@@ -82,6 +88,8 @@
             android:fontFamily="sans-serif-thin" />
 
     </LinearLayout>
+
+    </FrameLayout><!-- end clock_drift_container -->
 
     <!-- ══ Battery indicator — top-right ══ -->
     <TextView

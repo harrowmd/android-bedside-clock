@@ -1,5 +1,7 @@
 package com.manytwo.besideclock
 
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -9,12 +11,16 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.service.dreams.DreamService
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.*
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.random.Random
 
 class ClockDream : DreamService() {
 
@@ -42,6 +48,22 @@ class ClockDream : DreamService() {
     private var savedBrightness: Int = -1
     private var savedBrightnessMode: Int = -1
 
+    // OLED burn-in protection: slow periodic drift of the clock container
+    private lateinit var driftContainer: FrameLayout
+    private val driftHandler = Handler(Looper.getMainLooper())
+    private val driftRunnable = object : Runnable {
+        override fun run() {
+            driftClock()
+            driftHandler.postDelayed(this, DRIFT_INTERVAL_MS)
+        }
+    }
+
+    companion object {
+        private const val DRIFT_INTERVAL_MS = 3 * 60 * 1000L  // move every 3 minutes
+        private const val DRIFT_DURATION_MS  = 60 * 1000L      // glide over 60 seconds
+        private const val DRIFT_MAX_DP       = 22              // max offset in either axis
+    }
+
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             val level  = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
@@ -65,6 +87,7 @@ class ClockDream : DreamService() {
 
         settings = ClockSettings(this)
 
+        driftContainer   = findViewById(R.id.clock_drift_container)
         layoutSingle     = findViewById(R.id.layout_single)
         layoutGiant      = findViewById(R.id.layout_giant)
         tvTimeSingle     = findViewById(R.id.tv_time_single)
@@ -124,10 +147,15 @@ class ClockDream : DreamService() {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(batteryReceiver, filter)
         }
+
+        // Start drift after the first interval so the clock is fully visible at launch
+        driftHandler.postDelayed(driftRunnable, DRIFT_INTERVAL_MS)
     }
 
     override fun onDreamingStopped() {
         super.onDreamingStopped()
+        driftHandler.removeCallbacks(driftRunnable)
+        driftContainer.animate().cancel()
         dateTimer?.cancel(); dateTimer = null
         try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
         // Restore system brightness to what it was before the dream started
@@ -269,6 +297,23 @@ class ClockDream : DreamService() {
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { marginEnd = dp(8) }
         setOnClickListener { onClick() }
+    }
+
+    // ── OLED drift ────────────────────────────────────────────────────────────
+
+    private fun driftClock() {
+        val max = DRIFT_MAX_DP * resources.displayMetrics.density
+        val tx = Random.nextFloat() * 2 * max - max
+        val ty = Random.nextFloat() * 2 * max - max
+        ObjectAnimator.ofPropertyValuesHolder(
+            driftContainer,
+            PropertyValuesHolder.ofFloat(View.TRANSLATION_X, tx),
+            PropertyValuesHolder.ofFloat(View.TRANSLATION_Y, ty)
+        ).apply {
+            duration = DRIFT_DURATION_MS
+            interpolator = LinearInterpolator()
+            start()
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
