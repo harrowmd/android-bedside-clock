@@ -31,7 +31,7 @@ Wednesday, June 18
 
 ## Installation
 
-1. Download `app-debug.apk` from the [latest release](https://github.com/harrowmd/android-bedside-clock/releases/latest)
+1. Download `m21-bedside-clock.apk` from the [latest release](https://github.com/harrowmd/android-bedside-clock/releases/latest)
 2. On the phone: Settings → Security → enable **Install unknown apps** for your file manager
 3. Open the APK and install
 
@@ -92,12 +92,21 @@ The log is written to `Documents/bedside-clock.log` (requires storage permission
 
 Share the log via the **Share Log File** button in the app, or read it directly from `Internal Storage / Documents / bedside-clock.log`.
 
+Since v1.1.1, any app crash is also written to the log as a `CRASH:` line before the process exits, so unexpected issues can be diagnosed from the log file alone.
+
 ## Troubleshooting
 
 **Clock doesn't start**
 - Confirm the phone is on charge and unlocked when the screen times out
 - Check the app's **Phone Settings** section — "Lock after screen timeout" must not be "Immediately"
 - On some devices, the dream only starts from the unlocked home screen (not from the lock screen)
+- Some phones have a motion/pickup detector (e.g. a built-in pedometer or fitness-tracking app) that holds the screen on while the phone is being moved or handled. This is expected — the screensaver only kicks in once the phone is stationary and the screen actually times out, so set it down on the dock and leave it alone for a moment.
+
+**Screen goes blank overnight and doesn't come back on its own**
+- Update to v1.1.1 or later. Earlier versions (v1.1) had two bugs that could leave the screen dark for the rest of the night with no recovery until the phone was manually woken and re-docked:
+  - A crash in the session-logging code that killed the app every time the dream stopped (also the cause of brightness not being restored after **Exit clock**)
+  - Android occasionally handing the screensaver slot to its own (blank) ambient-display service instead of restarting Bedside Clock, if "Ambient display on pick-up" is enabled and the phone gets moved while charging
+- If it still happens after updating, share the log file — crashes are now written to it directly (see **Log file** below)
 
 **Screen goes blank after a few minutes**
 - Make sure `WRITE_SECURE_SETTINGS` has been granted via ADB (the app disables AOD during the dream to prevent the DozeService from stealing the display)
@@ -111,10 +120,16 @@ Share the log via the **Share Log File** button in the app, or read it directly 
 git clone https://github.com/harrowmd/android-bedside-clock.git
 cd android-bedside-clock
 gradle assembleDebug
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r app/build/outputs/apk/debug/m21-bedside-clock.apk
 ```
 
 Requires Android Studio or the Android SDK command-line tools.
+
+## Version history
+
+- **v1.1.1** — Fixed a crash in session/heartbeat logging that killed the app every time the dream stopped, silently leaving the screen blank until manually woken (also fixed brightness not being restored after **Exit clock**, same root cause). Fixed Android occasionally handing the screensaver slot to its own ambient-display service while charging. Crashes are now logged to the on-device log file.
+- **v1.1** — Phone settings panel, battery level/wattage in logs, 30-minute heartbeat logging.
+- **v1.0** — Initial release.
 
 ## Licence
 
