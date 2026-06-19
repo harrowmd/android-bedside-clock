@@ -32,8 +32,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnPreview.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_DREAM_SETTINGS))
-            Toast.makeText(this, "Tap the preview button next to Bedside Clock", Toast.LENGTH_LONG).show()
+            startActivity(Intent(this, ClockActivity::class.java))
         }
 
         binding.btnGrantBrightness.setOnClickListener {

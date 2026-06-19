@@ -110,8 +110,21 @@
         android:layout_gravity="bottom|end"
         android:padding="24dp"
         android:text="⚙"
-        android:textSize="22sp"
-        android:textColor="#44FFFFFF"
+        android:textSize="24sp"
+        android:textColor="#CCFFFFFF"
+        android:clickable="true"
+        android:focusable="true" />
+
+    <!-- ══ Quick exit button — bottom-left, clear of any on-screen nav bar ══ -->
+    <ImageView
+        android:id="@+id/btn_exit_quick"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:padding="24dp"
+        android:src="@drawable/ic_exit"
+        android:tint="#CCFFFFFF"
+        android:contentDescription="Exit clock"
         android:clickable="true"
         android:focusable="true" />
 

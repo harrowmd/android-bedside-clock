@@ -5,6 +5,7 @@ An Android bedside clock that activates automatically as a screensaver (DreamSer
 ## Features
 
 - **Auto-start** — activates via Android's screensaver (Dream) system when the phone is charging and the screen goes idle
+- **Manual daytime use** — tap **Open Clock** from the main screen to show the same clock immediately, with no need to be charging
 - **Clock display** — large time and date, with OLED burn-in protection (slow pixel drift every 3 minutes)
 - **Customisable** — choose colour, font, and size (S / M / L / XL); XL splits into a two-line giant clock
 - **Brightness control** — slider in the settings panel controls screen brightness independently of system settings; restored when the clock exits
@@ -78,7 +79,11 @@ The clock requires two phone settings to be correct (visible in the app's **Phon
 
 - Place the phone on the charging dock
 - Leave it alone — the clock appears within 30 seconds of the screen timing out
-- Tap the **⚙** gear (bottom-right) to open settings; tap **Save settings** or the backdrop to close; tap **Exit clock** to dismiss
+- Tap the **⚙** gear (bottom-right) to open settings; tap **Save settings** or the backdrop to close; tap **Exit clock** to dismiss, or tap the **⏏** icon (bottom-left) to exit immediately without opening settings
+
+### Using the clock during the day
+
+Tap **Open Clock** on the main screen to show the clock immediately, whether or not the phone is charging — useful for reviewing colours, fonts, sizes, and brightness without waiting for the screensaver. It's the exact same clock face and settings panel as the overnight version; tap the **⏏** icon (bottom-left) or **Exit clock** to close it.
 
 ## Log file
 
@@ -127,6 +132,7 @@ Requires Android Studio or the Android SDK command-line tools.
 
 ## Version history
 
+- **v1.2** — Added **Open Clock**, a one-tap button for manual daytime use (the same clock face and settings, no need to be charging). Added a quick-exit icon (bottom-left) so the clock can be dismissed without going through the settings panel.
 - **v1.1.1** — Fixed a crash in session/heartbeat logging that killed the app every time the dream stopped, silently leaving the screen blank until manually woken (also fixed brightness not being restored after **Exit clock**, same root cause). Fixed Android occasionally handing the screensaver slot to its own ambient-display service while charging. Crashes are now logged to the on-device log file.
 - **v1.1** — Phone settings panel, battery level/wattage in logs, 30-minute heartbeat logging.
 - **v1.0** — Initial release.

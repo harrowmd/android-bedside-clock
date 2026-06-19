@@ -29,6 +29,12 @@
             </intent-filter>
         </activity>
 
+        <!-- Manual daytime clock view, launched from MainActivity's "Open Clock" button -->
+        <activity
+            android:name=".ClockActivity"
+            android:exported="false"
+            android:theme="@style/Theme.BesideClock.Fullscreen" />
+
         <!--
             DreamService: Android's built-in screensaver/daydream system.
             Activates automatically when the phone is charging and the screen

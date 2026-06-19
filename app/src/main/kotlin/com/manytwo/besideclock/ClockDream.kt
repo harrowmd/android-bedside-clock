@@ -1,81 +1,29 @@
 package com.manytwo.besideclock
 
-import android.animation.ObjectAnimator
-import android.animation.PropertyValuesHolder
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.Color
-import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.os.BatteryManager
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.service.dreams.DreamService
-import android.view.View
-import android.view.animation.LinearInterpolator
-import android.widget.*
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlin.random.Random
 
 class ClockDream : DreamService() {
 
-    // Clock views
-    private lateinit var layoutSingle: LinearLayout
-    private lateinit var layoutGiant: LinearLayout
-    private lateinit var tvTimeSingle: TextClock
-    private lateinit var tvHour: TextClock
-    private lateinit var tvMinute: TextClock
-    private lateinit var tvDate: TextView
-    private lateinit var tvDateGiant: TextView
-    private lateinit var tvBattery: TextView
-
-    // Settings overlay views
-    private lateinit var overlaySettings: FrameLayout
-    private lateinit var rowColors: LinearLayout
-    private lateinit var rowFonts: LinearLayout
-    private lateinit var rowSizes: LinearLayout
-    private lateinit var sliderBrightness: SeekBar
-    private lateinit var tvVersion: TextView
-    private lateinit var btnCheckUpdate: TextView
-
-    private lateinit var settings: ClockSettings
-    private var dateTimer: Timer? = null
+    private lateinit var controller: ClockController
     private var dreamStartMs: Long = 0L
     private var startBatteryLevel: Int = -1
 
     // Saved so we can restore system settings when the dream ends
-    private var savedBrightness: Int = -1
-    private var savedBrightnessMode: Int = -1
     private var savedDozeAlwaysOn: Int = -1
     private var savedDozePulseOnPickUp: Int = -1
 
     // Explicit wake lock as a final fallback for OEM ROMs that ignore window flags
     private var wakeLock: PowerManager.WakeLock? = null
 
-    // OLED burn-in protection: slow periodic drift of the clock container
-    private lateinit var driftContainer: FrameLayout
-    private val driftHandler = Handler(Looper.getMainLooper())
-    private val driftRunnable = object : Runnable {
-        override fun run() {
-            driftClock()
-            driftHandler.postDelayed(this, DRIFT_INTERVAL_MS)
-        }
-    }
-
-    companion object {
-        private const val DRIFT_INTERVAL_MS     = 3 * 60 * 1000L   // move every 3 minutes
-        private const val DRIFT_DURATION_MS     = 60 * 1000L        // glide over 60 seconds
-        private const val DRIFT_MAX_DP          = 22                // max offset in either axis
-        private const val HEARTBEAT_INTERVAL_MS = 30 * 60 * 1000L  // log every 30 minutes
-    }
-
+    private val heartbeatHandler = Handler(Looper.getMainLooper())
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
             val elapsedSec = (System.currentTimeMillis() - dreamStartMs) / 1000L
@@ -84,32 +32,12 @@ class ClockDream : DreamService() {
             val wStr = if (watts > 0f) " ${if (charging) "+" else "-"}%.1fW".format(watts) else ""
             val timeStr = "%02d:%02d:%02d".format(h, m, s)
             Logger.log("[heartbeat] battery=${level}%$wStr elapsed=$timeStr")
-            driftHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
+            heartbeatHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
         }
     }
 
-    private val batteryReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            val level  = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-            val scale  = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-            val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-            val voltMV = intent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0)
-            val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                           status == BatteryManager.BATTERY_STATUS_FULL
-            if (level >= 0 && scale > 0) {
-                val pct = level * 100 / scale
-                val currentµA = try {
-                    val v = (context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager)
-                        .getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
-                    if (v == Integer.MIN_VALUE) 0 else v
-                } catch (_: Exception) { 0 }
-                val watts = if (voltMV > 0 && currentµA != 0)
-                    Math.abs(currentµA.toLong()).toFloat() / 1_000_000f * voltMV / 1000f else 0f
-                val wStr = if (watts > 0.1f)
-                    " (${if (charging) "+" else "-"}${"%.1f".format(watts)}W)" else ""
-                tvBattery.text = if (charging) "⚡ $pct%$wStr" else "$pct%$wStr"
-            }
-        }
+    companion object {
+        private const val HEARTBEAT_INTERVAL_MS = 30 * 60 * 1000L  // log every 30 minutes
     }
 
     override fun onAttachedToWindow() {
@@ -121,7 +49,6 @@ class ClockDream : DreamService() {
         setContentView(R.layout.dream_clock)
 
         Logger.init(this)
-        settings = ClockSettings(this)
 
         // Belt-and-suspenders: keep screen on even if the OEM power manager
         // tries to override the DreamService's own internal wake lock.
@@ -130,48 +57,7 @@ class ClockDream : DreamService() {
             android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
         )
 
-        driftContainer   = findViewById(R.id.clock_drift_container)
-        layoutSingle     = findViewById(R.id.layout_single)
-        layoutGiant      = findViewById(R.id.layout_giant)
-        tvTimeSingle     = findViewById(R.id.tv_time_single)
-        tvHour           = findViewById(R.id.tv_hour)
-        tvMinute         = findViewById(R.id.tv_minute)
-        tvDate           = findViewById(R.id.tv_date)
-        tvDateGiant      = findViewById(R.id.tv_date_giant)
-        tvBattery        = findViewById(R.id.tv_battery)
-        overlaySettings  = findViewById(R.id.overlay_settings)
-        rowColors        = findViewById(R.id.row_colors)
-        rowFonts         = findViewById(R.id.row_fonts)
-        rowSizes         = findViewById(R.id.row_sizes)
-        sliderBrightness = findViewById(R.id.slider_brightness)
-        tvVersion        = findViewById(R.id.tv_version)
-        btnCheckUpdate   = findViewById(R.id.btn_check_update)
-
-        tvVersion.text = "v${BuildConfig.VERSION_NAME}  ·  ${BuildConfig.BUILD_DATE}"
-        btnCheckUpdate.setOnClickListener { checkForUpdate() }
-
-        findViewById<TextView>(R.id.btn_settings).setOnClickListener { openSettings() }
-        findViewById<View>(R.id.backdrop).setOnClickListener { closeSettings() }
-        findViewById<TextView>(R.id.btn_dismiss).setOnClickListener { closeSettings() }
-        findViewById<TextView>(R.id.btn_exit_clock).setOnClickListener { wakeUp() }
-
-        sliderBrightness.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
-                // Map 0–100 → 0.01–1.0, enforcing a dim floor at progress 1
-                val level = if (progress == 0) 0.01f else progress / 100f
-                settings.brightness = level
-                applyBrightness(level)
-            }
-            override fun onStartTrackingTouch(sb: SeekBar) {}
-            override fun onStopTrackingTouch(sb: SeekBar) {
-                Logger.log("Brightness changed → ${sb.progress}%")
-            }
-        })
-
-        buildColorRow()
-        buildFontRow()
-        buildSizeRow()
-        applyAll()
+        controller = ClockController(this, window!!, findViewById(R.id.root_layout)) { wakeUp() }
     }
 
     override fun onDreamingStarted() {
@@ -181,15 +67,9 @@ class ClockDream : DreamService() {
         val (startLevel, startWatts, startCharging) = readBatteryInfo()
         startBatteryLevel = startLevel
         val wStr = if (startWatts > 0.1f) " ${if (startCharging) "+" else "-"}${"%.1f".format(startWatts)}W" else ""
+        val settings = ClockSettings(this)
         Logger.log("Clock started — font=${settings.fontFamily} size=${settings.fontSize.toInt()}sp brightness=${(settings.brightness * 100).toInt()}% battery=${startLevel}%$wStr")
-        // Save current system brightness so we can restore it when the dream ends
-        if (Settings.System.canWrite(this)) {
-            savedBrightness = Settings.System.getInt(
-                contentResolver, Settings.System.SCREEN_BRIGHTNESS, 128)
-            savedBrightnessMode = Settings.System.getInt(
-                contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE,
-                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
-        }
+
         // Disable AOD so the DozeService cannot steal the display while we are dreaming
         try {
             savedDozeAlwaysOn = Settings.Secure.getInt(contentResolver, "doze_always_on", 0)
@@ -208,20 +88,8 @@ class ClockDream : DreamService() {
         } catch (e: Exception) {
             Logger.log("Pick-up pulse disable skipped: ${e.message}")
         }
-        applyBrightness(settings.brightness)
-        updateDates()
-        dateTimer = Timer().also { t ->
-            t.scheduleAtFixedRate(object : TimerTask() {
-                override fun run() { tvDate.post { updateDates() } }
-            }, 60_000L - System.currentTimeMillis() % 60_000L, 60_000L)
-        }
-        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(batteryReceiver, filter, RECEIVER_NOT_EXPORTED)
-        } else {
-            @Suppress("UnspecifiedRegisterReceiverFlag")
-            registerReceiver(batteryReceiver, filter)
-        }
+
+        controller.start()
 
         // Explicit wake lock — last resort for ROMs that ignore FLAG_KEEP_SCREEN_ON
         @Suppress("DEPRECATION")
@@ -229,8 +97,7 @@ class ClockDream : DreamService() {
             .newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, "BesideClock::KeepOn")
             .also { it.acquire() }
 
-        driftHandler.postDelayed(driftRunnable, DRIFT_INTERVAL_MS)
-        driftHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS)
+        heartbeatHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS)
     }
 
     override fun onDreamingStopped() {
@@ -244,19 +111,11 @@ class ClockDream : DreamService() {
         } else ""
         val timeStr = "%02d:%02d:%02d".format(h, m, s)
         try { Logger.log("Clock stopped — elapsed $timeStr$deltaStr") } catch (_: Exception) {}
+
+        controller.stop()
         wakeLock?.release(); wakeLock = null
-        driftHandler.removeCallbacks(driftRunnable)
-        driftHandler.removeCallbacks(heartbeatRunnable)
-        driftContainer.animate().cancel()
-        dateTimer?.cancel(); dateTimer = null
-        try { unregisterReceiver(batteryReceiver) } catch (_: Exception) {}
-        // Restore system brightness to what it was before the dream started
-        if (Settings.System.canWrite(this) && savedBrightness >= 0) {
-            Settings.System.putInt(contentResolver,
-                Settings.System.SCREEN_BRIGHTNESS_MODE, savedBrightnessMode)
-            Settings.System.putInt(contentResolver,
-                Settings.System.SCREEN_BRIGHTNESS, savedBrightness)
-        }
+        heartbeatHandler.removeCallbacks(heartbeatRunnable)
+
         // Restore AOD setting
         try {
             if (savedDozeAlwaysOn >= 0)
@@ -267,200 +126,6 @@ class ClockDream : DreamService() {
             if (savedDozePulseOnPickUp >= 0)
                 Settings.Secure.putInt(contentResolver, "doze_pulse_on_pick_up", savedDozePulseOnPickUp)
         } catch (_: Exception) {}
-    }
-
-    // ── Apply all saved settings to the clock display ────────────────────────
-
-    private fun applyAll() {
-        val color    = settings.color
-        val typeface = Typeface.create(settings.fontFamily, Typeface.NORMAL)
-        val size     = settings.fontSize
-        val giant    = size >= 150f
-
-        layoutSingle.visibility = if (giant) View.GONE  else View.VISIBLE
-        layoutGiant.visibility  = if (giant) View.VISIBLE else View.GONE
-
-        val allText = listOf(tvTimeSingle, tvHour, tvMinute, tvDate, tvDateGiant, tvBattery)
-        allText.forEach { it.setTextColor(color) }
-        allText.forEach { it.typeface = typeface }
-
-        if (!giant) tvTimeSingle.textSize = size
-        // Giant clock uses the fixed 160sp set in XML; hour and minute lines
-        // always show the same font as selected.
-    }
-
-    // ── Settings overlay ─────────────────────────────────────────────────────
-
-    private fun openSettings() {
-        sliderBrightness.progress = (settings.brightness * 100).toInt()
-        buildColorRow()
-        buildFontRow()
-        buildSizeRow()
-        overlaySettings.visibility = View.VISIBLE
-        Logger.log("Settings opened")
-    }
-
-    private fun closeSettings() {
-        overlaySettings.visibility = View.GONE
-        Logger.log("Settings closed")
-    }
-
-    private fun buildColorRow() {
-        val palette = listOf(
-            0xFFFFAA00.toInt() to "Amber",
-            0xFFFFFFFF.toInt() to "White",
-            0xFFDDDDDD.toInt() to "Silver",
-            0xFF88CCFF.toInt() to "Ice Blue",
-            0xFF00E5FF.toInt() to "Cyan",
-            0xFF1DE9B6.toInt() to "Teal",
-            0xFF69FF47.toInt() to "Green",
-            0xFFCCFF00.toInt() to "Lime",
-            0xFFFFFF00.toInt() to "Yellow",
-            0xFFFF6D00.toInt() to "Orange",
-            0xFFFF5252.toInt() to "Red",
-            0xFFFF4081.toInt() to "Pink",
-            0xFFEA80FC.toInt() to "Purple",
-            0xFF7C4DFF.toInt() to "Indigo",
-        )
-        rowColors.removeAllViews()
-        val sz   = dp(44)
-        val gap  = dp(10)
-        val ring = dp(3)
-        palette.forEach { (color, name) ->
-            val selected = color == settings.color
-            val bg = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(color)
-                if (selected) setStroke(ring, Color.WHITE)
-            }
-            rowColors.addView(View(this).apply {
-                background = bg
-                contentDescription = name
-                layoutParams = LinearLayout.LayoutParams(sz, sz).apply { marginEnd = gap }
-                setOnClickListener {
-                    Logger.log("Colour changed → $name (#%06X)".format(color and 0xFFFFFF))
-                    settings.color = color
-                    applyAll()
-                    buildColorRow()
-                }
-            })
-        }
-    }
-
-    private fun buildFontRow() {
-        val fonts = listOf(
-            "sans-serif-thin"   to "Thin",
-            "sans-serif-light"  to "Light",
-            "sans-serif"        to "Regular",
-            "sans-serif-medium" to "Medium",
-            "monospace"         to "Mono",
-            "serif"             to "Serif",
-        )
-        rowFonts.removeAllViews()
-        fonts.forEach { (family, label) ->
-            rowFonts.addView(chip(label, family == settings.fontFamily,
-                Typeface.create(family, Typeface.NORMAL)) {
-                Logger.log("Font changed → $label ($family)")
-                settings.fontFamily = family
-                applyAll()
-                buildFontRow()
-            })
-        }
-    }
-
-    private fun buildSizeRow() {
-        val sizes = listOf(64f to "S", 96f to "M", 128f to "L", 160f to "XL")
-        rowSizes.removeAllViews()
-        sizes.forEach { (size, label) ->
-            rowSizes.addView(chip(label, size == settings.fontSize) {
-                Logger.log("Size changed → $label (${size.toInt()}sp)")
-                settings.fontSize = size
-                applyAll()
-                buildSizeRow()
-            })
-        }
-    }
-
-    private fun checkForUpdate() {
-        btnCheckUpdate.isClickable = false
-        btnCheckUpdate.text = "Checking…"
-        Thread {
-            val (latestTag, releaseUrl) = fetchLatestRelease()
-            driftHandler.post {
-                btnCheckUpdate.isClickable = true
-                val latest = latestTag.removePrefix("v")
-                if (latest.isNotEmpty() && latest != BuildConfig.VERSION_NAME) {
-                    btnCheckUpdate.text = "Update: v$latest — tap to download"
-                    btnCheckUpdate.setTextColor(Color.parseColor("#FFAA00"))
-                    btnCheckUpdate.setOnClickListener {
-                        startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(releaseUrl)).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        })
-                    }
-                } else if (latest.isEmpty()) {
-                    btnCheckUpdate.text = "Could not check — try again"
-                    driftHandler.postDelayed({ btnCheckUpdate.text = "Check for updates" }, 3_000)
-                } else {
-                    btnCheckUpdate.text = "Up to date ✓"
-                    driftHandler.postDelayed({
-                        btnCheckUpdate.text = "Check for updates"
-                        btnCheckUpdate.setOnClickListener { checkForUpdate() }
-                    }, 3_000)
-                }
-            }
-        }.start()
-    }
-
-    private fun chip(
-        text: String,
-        selected: Boolean,
-        typeface: Typeface? = null,
-        onClick: () -> Unit
-    ): TextView = TextView(this).apply {
-        this.text = text
-        this.typeface = typeface ?: Typeface.DEFAULT
-        textSize = 14f
-        setTextColor(if (selected) Color.WHITE else Color.parseColor("#999999"))
-        background = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(20).toFloat()
-            setColor(if (selected) 0x44FFFFFF.toInt() else 0x14FFFFFF.toInt())
-            setStroke(dp(1), if (selected) 0xBBFFFFFF.toInt() else 0x33FFFFFF.toInt())
-        }
-        val ph = dp(16); val pv = dp(7)
-        setPadding(ph, pv, ph, pv)
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { marginEnd = dp(8) }
-        setOnClickListener { onClick() }
-    }
-
-    // ── OLED drift ────────────────────────────────────────────────────────────
-
-    private fun driftClock() {
-        val max = DRIFT_MAX_DP * resources.displayMetrics.density
-        val tx = Random.nextFloat() * 2 * max - max
-        val ty = Random.nextFloat() * 2 * max - max
-        ObjectAnimator.ofPropertyValuesHolder(
-            driftContainer,
-            PropertyValuesHolder.ofFloat(View.TRANSLATION_X, tx),
-            PropertyValuesHolder.ofFloat(View.TRANSLATION_Y, ty)
-        ).apply {
-            duration = DRIFT_DURATION_MS
-            interpolator = LinearInterpolator()
-            start()
-        }
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private fun dp(n: Int) = (n * resources.displayMetrics.density).toInt()
-
-    private fun updateDates() {
-        val s = SimpleDateFormat("EEEE, MMMM d", Locale.getDefault()).format(Date())
-        tvDate.text = s
-        tvDateGiant.text = s
     }
 
     private fun readBatteryInfo(): Triple<Int, Float, Boolean> {
@@ -482,26 +147,5 @@ class ClockDream : DreamService() {
         val watts = if (voltMV > 0 && currentµA != 0)
             Math.abs(currentµA.toLong()).toFloat() / 1_000_000f * voltMV / 1000f else 0f
         return Triple(level, watts, charging)
-    }
-
-    private fun applyBrightness(level: Float) {
-        val clamped = level.coerceIn(0.01f, 1f)
-
-        // Primary: write directly to system brightness (reliable on all OEM ROMs)
-        if (Settings.System.canWrite(this)) {
-            Settings.System.putInt(contentResolver,
-                Settings.System.SCREEN_BRIGHTNESS_MODE,
-                Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
-            Settings.System.putInt(contentResolver,
-                Settings.System.SCREEN_BRIGHTNESS,
-                (clamped * 255).toInt().coerceIn(1, 255))
-        }
-
-        // Secondary: window-level brightness (works on stock Android / some OEMs)
-        window?.let { w ->
-            val lp = w.attributes
-            lp.screenBrightness = clamped
-            w.attributes = lp
-        }
     }
 }
