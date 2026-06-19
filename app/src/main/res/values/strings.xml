@@ -5,5 +5,5 @@
     <string name="preview">Open Clock</string>
     <string name="brightness_hint">To enable the brightness slider, grant permission to adjust system brightness.</string>
     <string name="grant_brightness">Grant Brightness Permission</string>
-    <string name="setup_instructions">Tap the button below, then:\n\n1. Select \"Bedside Clock\" from the list\n2. Set \"When to use\" to While charging\n\nThe amber clock will appear automatically whenever your phone is plugged in and the screen is idle.\n\nTap the clock screen to adjust brightness.</string>
+    <string name="setup_instructions">To automatically start the clock when charging:\n\n1. Tap \"Open Screensaver Settings\" below, then select \"Use screen saver\"\n2. Set \"When to start\" to \"While charging\"\n3. Scroll down and select \"Bedside Clock\" (no need to tap Customise)\n4. Tap Preview, then Back\n\nThe clock will then appear automatically whenever the phone is charging and the screen goes idle.\n\nTap the ⚙ gear icon (bottom-right) to customise the clock display. Tap the exit icon (bottom-left) to quit the clock.\n\nScroll down this page to check other vital permissions.</string>
 </resources>
