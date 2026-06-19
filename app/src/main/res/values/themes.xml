@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.BesideClock" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+    <style name="Theme.BesideClock" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/amber</item>
         <item name="colorPrimaryVariant">@color/amber_dark</item>
         <item name="colorOnPrimary">@color/black</item>

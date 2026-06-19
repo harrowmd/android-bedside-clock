@@ -16,8 +16,8 @@ android {
         applicationId = "com.manytwo.besideclock"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.2"
+        versionCode = 5
+        versionName = "1.2.1"
 
         buildConfigField("String", "BUILD_DATE", "\"$buildDate\"")
         buildConfigField("String", "GITHUB_REPO", "\"harrowmd/android-bedside-clock\"")
