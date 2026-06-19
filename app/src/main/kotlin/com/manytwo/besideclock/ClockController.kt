@@ -57,6 +57,8 @@ class ClockController(
     private val sliderBrightness: SeekBar = root.findViewById(R.id.slider_brightness)
     private val tvVersion: TextView = root.findViewById(R.id.tv_version)
     private val btnCheckUpdate: TextView = root.findViewById(R.id.btn_check_update)
+    private val btnSettingsIcon: TextView = root.findViewById(R.id.btn_settings)
+    private val btnExitQuick: ImageView = root.findViewById(R.id.btn_exit_quick)
 
     private var dateTimer: Timer? = null
 
@@ -105,11 +107,11 @@ class ClockController(
         tvVersion.text = "v${BuildConfig.VERSION_NAME}  ·  ${BuildConfig.BUILD_DATE}"
         btnCheckUpdate.setOnClickListener { checkForUpdate() }
 
-        root.findViewById<TextView>(R.id.btn_settings).setOnClickListener { openSettings() }
+        btnSettingsIcon.setOnClickListener { openSettings() }
         root.findViewById<View>(R.id.backdrop).setOnClickListener { closeSettings() }
         root.findViewById<TextView>(R.id.btn_dismiss).setOnClickListener { closeSettings() }
         root.findViewById<TextView>(R.id.btn_exit_clock).setOnClickListener { onExit() }
-        root.findViewById<View>(R.id.btn_exit_quick).setOnClickListener { onExit() }
+        btnExitQuick.setOnClickListener { onExit() }
 
         sliderBrightness.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(sb: SeekBar, progress: Int, fromUser: Boolean) {
@@ -189,6 +191,9 @@ class ClockController(
         if (!giant) tvTimeSingle.textSize = size
         // Giant clock uses the fixed 160sp set in XML; hour and minute lines
         // always show the same font as selected.
+
+        btnSettingsIcon.setTextColor(color)
+        btnExitQuick.setColorFilter(color)
     }
 
     // ── Settings overlay ─────────────────────────────────────────────────────

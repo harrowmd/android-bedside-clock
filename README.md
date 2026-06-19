@@ -132,6 +132,7 @@ Requires Android Studio or the Android SDK command-line tools.
 
 ## Version history
 
+- **v1.2.2** — The settings gear and exit icon now match the selected clock colour, instead of a fixed white/grey.
 - **v1.2.1** — Fixed a crash when tapping **Share Log File** (`FileProvider` didn't know about the public Documents folder where the log actually lives). Removed the redundant orange title bar on the main screen, and cleaned up the setup instructions there.
 - **v1.2** — Added **Open Clock**, a one-tap button for manual daytime use (the same clock face and settings, no need to be charging). Added a quick-exit icon (bottom-left) so the clock can be dismissed without going through the settings panel.
 - **v1.1.1** — Fixed a crash in session/heartbeat logging that killed the app every time the dream stopped, silently leaving the screen blank until manually woken (also fixed brightness not being restored after **Exit clock**, same root cause). Fixed Android occasionally handing the screensaver slot to its own ambient-display service while charging. Crashes are now logged to the on-device log file.
