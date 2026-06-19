@@ -54,6 +54,7 @@ class ClockDream : DreamService() {
     private var savedBrightness: Int = -1
     private var savedBrightnessMode: Int = -1
     private var savedDozeAlwaysOn: Int = -1
+    private var savedDozePulseOnPickUp: Int = -1
 
     // Explicit wake lock as a final fallback for OEM ROMs that ignore window flags
     private var wakeLock: PowerManager.WakeLock? = null
@@ -81,7 +82,8 @@ class ClockDream : DreamService() {
             val h = elapsedSec / 3600; val m = (elapsedSec % 3600) / 60; val s = elapsedSec % 60
             val (level, watts, charging) = readBatteryInfo()
             val wStr = if (watts > 0f) " ${if (charging) "+" else "-"}%.1fW".format(watts) else ""
-            Logger.log("[heartbeat] battery=${level}%$wStr elapsed=%02d:%02d:%02d".format(h, m, s))
+            val timeStr = "%02d:%02d:%02d".format(h, m, s)
+            Logger.log("[heartbeat] battery=${level}%$wStr elapsed=$timeStr")
             driftHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
         }
     }
@@ -196,6 +198,16 @@ class ClockDream : DreamService() {
         } catch (e: Exception) {
             Logger.log("AOD disable skipped: ${e.message}")
         }
+        // Disable pick-up/motion-triggered ambient pulse: otherwise DreamManagerService
+        // can hand the dream slot to the system DozeService (a blank ambient screen)
+        // whenever the device is moved, abandoning our clock until the user wakes it manually.
+        try {
+            savedDozePulseOnPickUp = Settings.Secure.getInt(contentResolver, "doze_pulse_on_pick_up", 0)
+            Settings.Secure.putInt(contentResolver, "doze_pulse_on_pick_up", 0)
+            Logger.log("Pick-up pulse disabled for dream session")
+        } catch (e: Exception) {
+            Logger.log("Pick-up pulse disable skipped: ${e.message}")
+        }
         applyBrightness(settings.brightness)
         updateDates()
         dateTimer = Timer().also { t ->
@@ -230,7 +242,8 @@ class ClockDream : DreamService() {
             val d = stopLevel - startBatteryLevel
             " battery=${stopLevel}% (${if (d >= 0) "+$d" else "$d"}%)"
         } else ""
-        Logger.log("Clock stopped — elapsed %02d:%02d:%02d$deltaStr".format(h, m, s))
+        val timeStr = "%02d:%02d:%02d".format(h, m, s)
+        try { Logger.log("Clock stopped — elapsed $timeStr$deltaStr") } catch (_: Exception) {}
         wakeLock?.release(); wakeLock = null
         driftHandler.removeCallbacks(driftRunnable)
         driftHandler.removeCallbacks(heartbeatRunnable)
@@ -248,6 +261,11 @@ class ClockDream : DreamService() {
         try {
             if (savedDozeAlwaysOn >= 0)
                 Settings.Secure.putInt(contentResolver, "doze_always_on", savedDozeAlwaysOn)
+        } catch (_: Exception) {}
+        // Restore pick-up/motion-triggered ambient pulse setting
+        try {
+            if (savedDozePulseOnPickUp >= 0)
+                Settings.Secure.putInt(contentResolver, "doze_pulse_on_pick_up", savedDozePulseOnPickUp)
         } catch (_: Exception) {}
     }
 

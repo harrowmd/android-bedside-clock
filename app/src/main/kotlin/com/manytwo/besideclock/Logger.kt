@@ -12,9 +12,26 @@ object Logger {
     private var logFile: File? = null
     private val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
     private const val MAX_LINES = 200
+    private var crashHandlerInstalled = false
 
     fun init(context: Context) {
         logFile = resolveFile(context)
+        installCrashHandler()
+    }
+
+    // So a future regression is diagnosable from the log file alone, without
+    // needing adb logcat attached at the moment it happens.
+    private fun installCrashHandler() {
+        if (crashHandlerInstalled) return
+        crashHandlerInstalled = true
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val where = throwable.stackTrace.firstOrNull()?.toString() ?: "unknown"
+                log("CRASH: ${throwable.javaClass.simpleName}: ${throwable.message} at $where")
+            } catch (_: Exception) {}
+            previous?.uncaughtException(thread, throwable)
+        }
     }
 
     fun log(message: String) {

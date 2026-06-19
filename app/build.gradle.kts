@@ -46,6 +46,13 @@ android {
         viewBinding = true
         buildConfig = true
     }
+
+    applicationVariants.all {
+        outputs.all {
+            (this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl)?.outputFileName =
+                "m21-bedside-clock.apk"
+        }
+    }
 }
 
 dependencies {
