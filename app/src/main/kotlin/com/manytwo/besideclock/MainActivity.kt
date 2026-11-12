@@ -86,12 +86,15 @@ class MainActivity : AppCompatActivity() {
         else
             getString(R.string.grant_brightness)
 
-        val storageGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.R ||
-                Environment.isExternalStorageManager()
-        binding.btnGrantStorage.text = if (storageGranted)
-            "Log file: Documents/bedside-clock.log ✓"
-        else
-            "Grant log file access (Documents)"
+        // Before Android 11 there is no all-files access, so the log stays in the app's own folder.
+        binding.btnGrantStorage.text = when {
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.R ->
+                "Log file: app folder (use Share Log File) ✓"
+            Environment.isExternalStorageManager() ->
+                "Log file: Documents/bedside-clock.log ✓"
+            else ->
+                "Grant log file access (Documents)"
+        }
 
         updatePhoneSettings()
     }

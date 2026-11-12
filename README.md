@@ -48,6 +48,8 @@ adb shell appops set com.manytwo.besideclock MANAGE_EXTERNAL_STORAGE allow
 ```
 
 > **Note:** Both permissions are wiped on reinstall and must be re-granted each time.
+>
+> On Android 10 and older, skip the `appops` line (that permission doesn't exist there). The log is then kept in the app's own folder; use **Share Log File** to get it.
 
 To connect wirelessly: Settings → Developer options → Wireless debugging, then `adb pair <ip>:<port>`.
 
@@ -56,7 +58,7 @@ To connect wirelessly: Settings → Developer options → Wireless debugging, th
 Open the **Bedside Clock** app and tap:
 
 - **Grant Brightness** — allows the clock to control screen brightness
-- **Grant Log File Access** — allows the log to be written to `Documents/bedside-clock.log`
+- **Grant Log File Access** — allows the log to be written to `Documents/bedside-clock.log` (Android 11+; on Android 10 the log stays in the app folder)
 
 ### 3. Enable as screensaver
 

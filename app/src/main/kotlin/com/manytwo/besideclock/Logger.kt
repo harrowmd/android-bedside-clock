@@ -1,6 +1,7 @@
 package com.manytwo.besideclock
 
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import java.io.File
 import java.text.SimpleDateFormat
@@ -52,7 +53,8 @@ object Logger {
     private fun resolveFile(context: Context): File {
         // Prefer public Documents so the user can find it in any file manager.
         // MANAGE_EXTERNAL_STORAGE must be granted for this to work on Android 11+.
-        if (Environment.isExternalStorageManager()) {
+        // isExternalStorageManager() only exists on Android 11+; calling it on Android 10 crashes.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) {
             val docs = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
             if (docs.exists() || docs.mkdirs()) {
                 return File(docs, "bedside-clock.log")
